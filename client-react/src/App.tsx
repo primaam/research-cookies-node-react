@@ -1,21 +1,39 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Cookies from 'js-cookie';
-import './App.css'
+import './App.css';
 
 axios.defaults.withCredentials = true;
+
+interface User{
+  id: string;
+  username: string;
+}
+
+const initialUser:User = {
+  id: '',
+  username: ''
+}
 
 function App() {
   const [status, setStatus] = useState('Status: Tidak ada session');
   const [clientCookieStatus, setClientCookieStatus] = useState('Client Cookie: Tidak ada');
+  const [userProfile, setUserProfile] = useState<User>(initialUser);
+
+  // Fungsi untuk memeriksa dan load profile saat komponen mount
+  useEffect(() => {
+    checkServerCookie();
+  }, []);
 
   const checkServerCookie = async () => {
     try {
       const response = await axios.get('http://localhost:5000/get-cookie');
       if (response.data.sessionId) {
         setStatus(`Status: Valid (Session ID: ${response.data.sessionId})`);
+        fetchUserProfile(); // Otomatis fetch profile jika cookie valid
       } else {
         setStatus('Status: Tidak valid');
+        setUserProfile(initialUser);
       }
     } catch (error) {
       setStatus('Status: Error memeriksa cookie');
@@ -23,13 +41,24 @@ function App() {
     }
   };
 
+  const fetchUserProfile = async () => {
+    try {
+      const response = await axios.get('http://localhost:5000/profile');
+      if (response.data.success) {
+        setUserProfile(response.data.user);
+      } else {
+        setUserProfile(initialUser);
+      }
+    } catch (error) {
+      console.error('Gagal mengambil profile:', error);
+    }
+  };
+
   const checkClientCookie = () => {
     const cookie = Cookies.get('client_cookie');
-    if (cookie) {
-      setClientCookieStatus(`Client Cookie: Ada (${cookie})`);
-    } else {
-      setClientCookieStatus('Client Cookie: Tidak ada');
-    }
+    setClientCookieStatus(cookie 
+      ? `Client Cookie: Ada (${cookie})` 
+      : 'Client Cookie: Tidak ada');
   };
 
   const setServerCookie = async () => {
@@ -52,6 +81,7 @@ function App() {
     try {
       await axios.get('http://localhost:5000/clear-cookie');
       setStatus('Status: Cookie server dihapus');
+      setUserProfile(initialUser);
       checkServerCookie();
     } catch (error) {
       setStatus('Status: Gagal menghapus cookie');
@@ -71,7 +101,8 @@ function App() {
         password: 'pass1'
       });
       if (response.data.success) {
-        setStatus(`Status: Login berhasil (User: ${response.data.user.username})`);
+        setStatus(`Status: Login berhasil`);
+        fetchUserProfile();
       } else {
         setStatus('Status: Login gagal');
       }
@@ -85,6 +116,7 @@ function App() {
     try {
       await axios.post('http://localhost:5000/logout');
       setStatus('Status: Logout berhasil');
+      setUserProfile(initialUser);
     } catch (error) {
       setStatus('Status: Gagal logout');
       console.error(error);
@@ -93,12 +125,20 @@ function App() {
 
   return (
     <div className="app">
-      <h1>Demo Cookies</h1>
+      <h1>Demo Cookies dengan Profile</h1>
       
       <div className="status-box">
         <p>{status}</p>
         <p>{clientCookieStatus}</p>
       </div>
+      
+      {userProfile && (
+        <div className="profile-box">
+          <h2>User Profile</h2>
+          <p><strong>ID:</strong> {userProfile.id}</p>
+          <p><strong>Username:</strong> {userProfile.username}</p>
+        </div>
+      )}
       
       <div className="button-group">
         <h2>Server Cookies</h2>
@@ -119,4 +159,4 @@ function App() {
   );
 }
 
-export default App
+export default App;
